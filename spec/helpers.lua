@@ -4397,4 +4397,6 @@ end
   get_available_port = get_available_port,
 
   make_temp_dir = make_temp_dir,
+
+  build_go_plugins = build_go_plugins,
 }
