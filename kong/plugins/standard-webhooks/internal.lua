@@ -2,10 +2,19 @@ local kong = kong
 local hmac = require "resty.openssl.hmac"
 local tonumber = tonumber
 local ngx = ngx
+local type = type
 
 local HEADER_WEBHOOK_ID = "webhook-id"
 local HEADER_WEBHOOK_SIGN = "webhook-signature"
 local HEADER_WEBHOOK_TS = "webhook-timestamp"
+
+local function getHeader(input)
+  if type(input) == "table" then
+    return input[1]
+  else
+    return input
+  end
+end
 
 local function sign(secret, id, ts, payload)
   local d, err = hmac.new(secret, "sha256")
@@ -13,8 +22,7 @@ local function sign(secret, id, ts, payload)
     kong.log.error(err)
     return kong.response.error(500)
   end
-  d:update(id .. "." .. ts .. "." .. payload)
-  local r, err = d:final()
+  local r, err = d:final(id .. "." .. ts .. "." .. payload)
   if err then
     kong.log.error(err)
     return kong.response.error(500)
@@ -25,9 +33,9 @@ end
 local function extract_webhook()
   local headers = kong.request.get_headers()
 
-  local id = headers[HEADER_WEBHOOK_ID]
-  local signature = headers[HEADER_WEBHOOK_SIGN]
-  local ts = headers[HEADER_WEBHOOK_TS]
+  local id = getHeader(headers[HEADER_WEBHOOK_ID])
+  local signature = getHeader(headers[HEADER_WEBHOOK_SIGN])
+  local ts = getHeader(headers[HEADER_WEBHOOK_TS])
   if not id or not signature or not ts then
     kong.log.debug("Missing Required Headers")
     return kong.response.error(400)
