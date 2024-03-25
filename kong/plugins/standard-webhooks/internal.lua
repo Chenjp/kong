@@ -64,7 +64,7 @@ local function access(config)
 
   local expected_signature = sign(config.secret, id, ts, body)
 
-  if (" "..signature.." "):find(" "..expected_signature.." ", 1, true) then
+  if signature == expected_signature then
     return
   end
 
