@@ -208,7 +208,7 @@ else
       { response_buffering  = { description = "Whether to enable response body buffering or not.", type = "boolean", required = true, default = true }, },
       { snis = { type = "set",
                  description = "A list of SNIs that match this Route when using stream routing.",
-                 elements = typedefs.sni }, },
+                 elements = typedefs.wildcard_host }, },
       { sources = typedefs.sources },
       { destinations = typedefs.destinations },
       { tags             = typedefs.tags },
