@@ -107,7 +107,7 @@ function _M.to_ollama(request_table, model)
   if model.options then
     input.options = {}
 
-    input.options.num_predict = request_table.num_predict or nil
+    input.options.num_predict = request_table.num_predict or model.options.max_tokens
     input.options.temperature = request_table.temperature or model.options.temperature
     input.options.top_p = request_table.top_p or model.options.top_p
     input.options.top_k = request_table.top_k or model.options.top_k
