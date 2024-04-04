@@ -22,50 +22,49 @@ local function internal_server_error(msg)
 end
 
 function _M:header_filter(conf)
-
-  if not kong.ctx.shared.skip_response_transformer then
-    -- clear shared restricted headers
-    for i, v in ipairs(ai_shared.clear_response_headers.shared) do
-      kong.response.clear_header(v)
-    end
-
-    -- only act on 200 in first release - pass the unmodifed response all the way through if any failure
-    if kong.response.get_status() == 200 then
-      local ai_driver = require("kong.llm.drivers." .. conf.model.provider)
-      local route_type = conf.route_type
-      
-      local response_body = kong.service.response.get_raw_body()
-
-      if response_body then
-        local is_gzip = kong.response.get_header("Content-Encoding") == "gzip"
-
-        if is_gzip then
-          response_body = kong_utils.inflate_gzip(response_body)
-        end
-
-        local new_response_string, err = ai_driver.from_format(response_body, conf.model, route_type)
-        if err then
-          kong.ctx.plugin.ai_parser_error = true
-
-          ngx.status = 500
-          local message = {
-            error = {
-              message = err,
-            },
-          }
-
-          kong.ctx.plugin.parsed_response = cjson.encode(message)
-        
-        elseif new_response_string then
-          -- preserve the same response content type; assume the from_format function
-          -- has returned the body in the appropriate response output format
-          kong.ctx.plugin.parsed_response = new_response_string
-        end
-
-        ai_driver.post_request(conf)
-      end
-    end
+  if kong.ctx.shared.skip_response_transformer then
+    return
   end
+
+  -- clear shared restricted headers
+  for _, v in ipairs(ai_shared.clear_response_headers.shared) do
+    kong.response.clear_header(v)
+  end
+
+  -- only act on 200 in first release - pass the unmodifed response all the way through if any failure
+  if kong.response.get_status() ~= 200 then
+    return
+  end
+
+  local response_body = kong.service.response.get_raw_body()
+  if not response_body then
+    return
+  end
+
+  local ai_driver = require("kong.llm.drivers." .. conf.model.provider)
+  local route_type = conf.route_type
+
+  local is_gzip = kong.response.get_header("Content-Encoding") == "gzip"
+  if is_gzip then
+    response_body = kong_utils.inflate_gzip(response_body)
+  end
+
+  local new_response_string, err = ai_driver.from_format(response_body, conf.model, route_type)
+  if err then
+    kong.ctx.plugin.ai_parser_error = true
+
+    ngx.status = 500
+    ERROR_MSG.error.message = err
+
+    kong.ctx.plugin.parsed_response = cjson.encode(ERROR_MSG)
+
+  elseif new_response_string then
+    -- preserve the same response content type; assume the from_format function
+    -- has returned the body in the appropriate response output format
+    kong.ctx.plugin.parsed_response = new_response_string
+  end
+
+  ai_driver.post_request(conf)
 end
 
 function _M:body_filter(conf)
@@ -94,6 +93,7 @@ function _M:body_filter(conf)
       local ai_driver = require("kong.llm.drivers." .. conf.model.provider)
       local route_type = conf.route_type
       local new_response_string, err = ai_driver.from_format(response_body, conf.model, route_type)
+      
       if err then
         kong.log.warn("issue when transforming the response body for analytics in the body filter phase, ", err)
       elseif new_response_string then
