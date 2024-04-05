@@ -1112,7 +1112,7 @@ return {
       local has_timing = ctx.has_timing
 
       if has_timing then
-        req_dyn_hook_run_hooks(ctx, "timing", "before:router")
+        req_dyn_hook_run_hooks("timing", "before:router")
       end
 
       -- routing request
@@ -1120,7 +1120,7 @@ return {
       local match_t = router:exec(ctx)
 
       if has_timing then
-        req_dyn_hook_run_hooks(ctx, "timing", "after:router")
+        req_dyn_hook_run_hooks("timing", "after:router")
       end
 
       if not match_t then
@@ -1141,7 +1141,7 @@ return {
       ctx.workspace = match_t.route and match_t.route.ws_id
 
       if has_timing then
-        req_dyn_hook_run_hooks(ctx, "timing", "workspace_id:got", ctx.workspace)
+        req_dyn_hook_run_hooks("timing", "workspace_id:got", ctx.workspace)
       end
 
       local host           = var.host
@@ -1438,7 +1438,7 @@ return {
 
       local upstream_status_header = constants.HEADERS.UPSTREAM_STATUS
       if kong.configuration.enabled_headers[upstream_status_header] then
-        local upstream_status = ctx.buffered_status or tonumber(sub(var.upstream_status or "", -3))
+        local upstream_status = ctx.buffered_status or tonumber(sub(var.upstream_status or "", -3)) or ngx.status
         header[upstream_status_header] = upstream_status
         if not header[upstream_status_header] then
           log(ERR, "failed to set ", upstream_status_header, " header")

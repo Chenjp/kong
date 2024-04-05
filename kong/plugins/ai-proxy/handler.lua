@@ -5,21 +5,33 @@ local ai_shared = require("kong.llm.drivers.shared")
 local llm = require("kong.llm")
 local cjson = require("cjson.safe")
 local kong_utils = require("kong.tools.gzip")
-local kong_meta = require "kong.meta"
+local kong_meta = require("kong.meta")
 --
+
 
 _M.PRIORITY = 770
 _M.VERSION = "1.2.0"
 
+
+-- reuse this table for error message response
+local ERROR_MSG = { error = { message = "" } }
+
+
 local function bad_request(msg)
   kong.log.warn(msg)
-  return kong.response.exit(400, { error = { message = msg } })
+  ERROR_MSG.error.message = msg
+
+  return kong.response.exit(400, ERROR_MSG)
 end
+
 
 local function internal_server_error(msg)
   kong.log.err(msg)
-  return kong.response.exit(500, { error = { message = msg } })
+  ERROR_MSG.error.message = msg
+
+  return kong.response.exit(500, ERROR_MSG)
 end
+
 
 function _M:header_filter(conf)
   if kong.ctx.shared.skip_response_transformer then
@@ -47,6 +59,7 @@ function _M:header_filter(conf)
   local is_gzip = kong.response.get_header("Content-Encoding") == "gzip"
   if is_gzip then
     response_body = kong_utils.inflate_gzip(response_body)
+
   end
 
   local new_response_string, err = ai_driver.from_format(response_body, conf.model, route_type)
@@ -66,6 +79,7 @@ function _M:header_filter(conf)
 
   ai_driver.post_request(conf)
 end
+
 
 function _M:body_filter(conf)
   -- if body_filter is called twice, then return
@@ -133,6 +147,7 @@ function _M:body_filter(conf)
   kong.ctx.plugin.body_called = true
 end
 
+
 function _M:access(conf)
   kong.service.request.enable_buffering()
 
@@ -143,10 +158,12 @@ function _M:access(conf)
   local ai_driver = require("kong.llm.drivers." .. conf.model.provider)
 
   local request_table
+
   -- we may have received a replacement / decorated request body from another AI plugin
   if kong.ctx.shared.replacement_request then
     kong.log.debug("replacement request body received from another AI plugin")
     request_table = kong.ctx.shared.replacement_request
+
   else
     -- first, calculate the coordinates of the request
     local content_type = kong.request.get_header("Content-Type") or "application/json"
@@ -159,7 +176,7 @@ function _M:access(conf)
   end
 
   -- check the incoming format is the same as the configured LLM format
-  local compatible, err = llm.is_compatible(request_table, conf.route_type)
+  local compatible, err = llm.is_compatible(request_table, route_type)
   if not compatible then
     kong.ctx.shared.skip_response_transformer = true
     return bad_request(err)
@@ -190,8 +207,9 @@ function _M:access(conf)
   if not ok then
     return internal_server_error(err)
   end
-  
+
   -- lights out, and away we go
 end
+
 
 return _M

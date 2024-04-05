@@ -1,12 +1,14 @@
 local tablex       = require "pl.tablex"
 local pretty       = require "pl.pretty"
-local utils        = require "kong.tools.utils"
+local table_tools  = require "kong.tools.table"
 local cjson        = require "cjson"
 local new_tab      = require "table.new"
 local nkeys        = require "table.nkeys"
 local is_reference = require "kong.pdk.vault".is_reference
 local json         = require "kong.db.schema.json"
 local cjson_safe   = require "cjson.safe"
+local deprecation  = require "kong.deprecation"
+local deepcompare  = require "pl.tablex".deepcompare
 
 
 local setmetatable = setmetatable
@@ -35,8 +37,8 @@ local sub          = string.sub
 local safe_decode  = cjson_safe.decode
 
 
-local random_string = utils.random_string
-local uuid = utils.uuid
+local random_string = require("kong.tools.rand").random_string
+local uuid = require("kong.tools.uuid").uuid
 local json_validate = json.validate
 
 
@@ -882,6 +884,16 @@ function Schema:validate_field(field, value)
     return nil, validation_errors.SUBSCHEMA_ABSTRACT_FIELD
   end
 
+  if field.deprecation then
+    local old_default = field.deprecation.old_default
+    local should_warn = old_default == nil
+                        or not deepcompare(value, old_default)
+    if should_warn then
+      deprecation(field.deprecation.message,
+          { after = field.deprecation.removal_in_version, })
+    end
+  end
+
   if field.type == "array" then
     if not is_sequence(value) then
       return nil, validation_errors.ARRAY
@@ -1013,7 +1025,7 @@ end
 local function handle_missing_field(field, value, opts)
   local no_defaults = opts and opts.no_defaults
   if field.default ~= nil and not no_defaults then
-    local copy = utils.cycle_aware_deep_copy(field.default)
+    local copy = table_tools.cycle_aware_deep_copy(field.default)
     if (field.type == "array" or field.type == "set")
       and type(copy) == "table"
       and not getmetatable(copy)
@@ -1651,7 +1663,7 @@ function Schema:process_auto_fields(data, context, nulls, opts)
 
   local is_select = context == "select"
   if not is_select then
-    data = utils.cycle_aware_deep_copy(data)
+    data = table_tools.cycle_aware_deep_copy(data)
   end
 
   local shorthand_fields = self.shorthand_fields
@@ -1682,7 +1694,7 @@ function Schema:process_auto_fields(data, context, nulls, opts)
       end
 
       if is_select and sdata.translate_backwards and not(opts and opts.hide_shorthands) then
-        data[sname] = utils.table_path(data, sdata.translate_backwards)
+        data[sname] = table_tools.table_path(data, sdata.translate_backwards)
       end
     end
     if has_errs then
@@ -1694,7 +1706,7 @@ function Schema:process_auto_fields(data, context, nulls, opts)
   local now_ms
 
   -- We don't want to resolve references on control planes
-  -- and and admin api requests, admin api request could be
+  -- and admin api requests, admin api request could be
   -- detected with ngx.ctx.KONG_PHASE, but to limit context
   -- access we use nulls that admin api sets to true.
   local kong = kong
@@ -1778,7 +1790,7 @@ function Schema:process_auto_fields(data, context, nulls, opts)
               if err then
                 kong.log.warn("unable to resolve reference ", value, " (", err, ")")
               else
-                kong.log.warn("unable to resolve reference ", value)
+                kong.log.notice("unable to resolve reference ", value)
               end
 
               value = ""
@@ -1817,7 +1829,7 @@ function Schema:process_auto_fields(data, context, nulls, opts)
                     if err then
                       kong.log.warn("unable to resolve reference ", value[i], " (", err, ")")
                     else
-                      kong.log.warn("unable to resolve reference ", value[i])
+                      kong.log.notice("unable to resolve reference ", value[i])
                     end
 
                     value[i] = ""
@@ -1863,7 +1875,7 @@ function Schema:process_auto_fields(data, context, nulls, opts)
                     if err then
                       kong.log.warn("unable to resolve reference ", v, " (", err, ")")
                     else
-                      kong.log.warn("unable to resolve reference ", v)
+                      kong.log.notice("unable to resolve reference ", v)
                     end
 
                     value[k] = ""
@@ -2066,7 +2078,7 @@ function Schema:validate_immutable_fields(input, entity)
   local errors = {}
 
   for key, field in self:each_field(input) do
-    local compare = utils.is_array(input[key]) and tablex.compare_no_order or tablex.deepcompare
+    local compare = table_tools.is_array(input[key]) and tablex.compare_no_order or tablex.deepcompare
 
     if field.immutable and entity[key] ~= nil and not compare(input[key], entity[key]) then
       errors[key] = validation_errors.IMMUTABLE
@@ -2425,7 +2437,7 @@ function Schema.new(definition, is_subschema)
     return nil, validation_errors.SCHEMA_NO_FIELDS
   end
 
-  local self = utils.cycle_aware_deep_copy(definition)
+  local self = table_tools.cycle_aware_deep_copy(definition)
   setmetatable(self, Schema)
 
   local cache_key = self.cache_key
