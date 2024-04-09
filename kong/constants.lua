@@ -277,7 +277,9 @@ local constants = {
       exit = "kong",
       service = "upstream",
     }
-  }
+  },
+
+  WASM_BUNDLED_FILTERS_PATH = "/usr/local/kong/include/filters",
 }
 
 for _, v in ipairs(constants.CLUSTERING_SYNC_STATUS) do

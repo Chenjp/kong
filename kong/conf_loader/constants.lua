@@ -641,4 +641,6 @@ return {
   _NOP_TOSTRING_MT = _NOP_TOSTRING_MT,
 
   LMDB_VALIDATION_TAG = LMDB_VALIDATION_TAG,
+
+  WASM_BUNDLED_FILTERS_PATH = "/usr/local/kong/include/filters",
 }

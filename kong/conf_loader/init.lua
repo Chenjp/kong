@@ -590,8 +590,7 @@ local function load(path, custom_conf, opts)
     ---@type table<string, boolean>
     local active_filter_names = {}
 
-    -- TODO: make this a distribution constant of sorts
-    local bundled_filters = get_wasm_filters("/usr/local/kong/include/filters") or {}
+    local bundled_filters = get_wasm_filters(conf_constants.WASM_BUNDLED_FILTERS_PATH)
     for _, filter in ipairs(bundled_filters) do
       if allow_bundled_filters or allowed_filter_names[filter.name] then
         insert(active_filters, filter)
