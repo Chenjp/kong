@@ -96,14 +96,17 @@ if kong_router_flavor == "expressions" then
 -- router_flavor in ('traditional_compatible', 'traditional')
 else
   local PATH_V1_DEPRECATION_MSG
+  local snis_elements_type
 
   if kong_router_flavor == "traditional" then
+    snis_elements_type = typedefs.sni
     PATH_V1_DEPRECATION_MSG =
       "path_handling='v1' is deprecated and " ..
       "will be removed in future version, " ..
       "please use path_handling='v0' instead"
 
   elseif kong_router_flavor == "traditional_compatible" then
+    snis_elements_type = typedefs.wildcard_host
     PATH_V1_DEPRECATION_MSG =
       "path_handling='v1' is deprecated and " ..
       "will not work under 'traditional_compatible' router_flavor, " ..
@@ -208,7 +211,7 @@ else
       { response_buffering  = { description = "Whether to enable response body buffering or not.", type = "boolean", required = true, default = true }, },
       { snis = { type = "set",
                  description = "A list of SNIs that match this Route when using stream routing.",
-                 elements = typedefs.wildcard_host }, },
+                 elements = snis_elements_type }, },
       { sources = typedefs.sources },
       { destinations = typedefs.destinations },
       { tags             = typedefs.tags },
