@@ -1948,10 +1948,23 @@ describe("Configuration loader", function()
 
   describe("#wasm properties", function()
     local temp_dir, cleanup
+    local user_filters
 
     lazy_setup(function()
       temp_dir, cleanup = helpers.make_temp_dir()
-      assert(helpers.file.write(temp_dir .. "/empty-filter.wasm", "hello!"))
+      assert(helpers.file.write(temp_dir .. "/filter-a.wasm", "hello!"))
+      assert(helpers.file.write(temp_dir .. "/filter-b.wasm", "hello!"))
+
+      user_filters = {
+        {
+          name = "filter-a",
+          path = temp_dir .. "/filter-a.wasm",
+        },
+        {
+          name = "filter-b",
+          path = temp_dir .. "/filter-b.wasm",
+        }
+      }
     end)
 
     lazy_teardown(function() cleanup() end)
@@ -1979,12 +1992,7 @@ describe("Configuration loader", function()
         wasm_filters_path = temp_dir,
       })
       assert.is_nil(err)
-      assert.same({
-          {
-              name = "empty-filter",
-              path = temp_dir .. "/empty-filter.wasm",
-          }
-      }, conf.wasm_modules_parsed)
+      assert.same(user_filters, conf.wasm_modules_parsed)
       assert.same(temp_dir, conf.wasm_filters_path)
     end)
 
@@ -1995,6 +2003,59 @@ describe("Configuration loader", function()
       })
       assert.same(err, "wasm_filters_path 'spec/fixtures/no-wasm-here/unit-test' is not a valid directory")
       assert.is_nil(conf)
+    end)
+
+    it("wasm_filters default with unspecified `wasm_filters_path`", function()
+      local conf, err = conf_loader(nil, {
+        wasm = "on",
+        wasm_filters_path = nil,
+      })
+      assert.is_nil(err)
+      assert.same({}, conf.wasm_modules_parsed)
+      assert.same({ "off" }, conf.wasm_filters)
+    end)
+
+    it("wasm_filters default when `wasm_filters_path` is set", function()
+      local conf, err = conf_loader(nil, {
+        wasm = "on",
+        wasm_filters_path = temp_dir,
+      })
+      assert.is_nil(err)
+      assert.same(user_filters, conf.wasm_modules_parsed)
+      assert.same({ "user" }, conf.wasm_filters)
+    end)
+
+    it("wasm_filters = off", function()
+      local conf, err = conf_loader(nil, {
+        wasm = "on",
+        wasm_filters = "off",
+        wasm_filters_path = temp_dir,
+      })
+      assert.is_nil(err)
+      assert.same({}, conf.wasm_modules_parsed)
+    end)
+
+    it("wasm_filters = 'user' allows all user filters", function()
+      local conf, err = conf_loader(nil, {
+        wasm = "on",
+        wasm_filters = "user",
+        wasm_filters_path = temp_dir,
+      })
+      assert.is_nil(err)
+      assert.same(user_filters, conf.wasm_modules_parsed)
+    end)
+
+    it("wasm_filters can allow individual user filters", function()
+      local conf, err = conf_loader(nil, {
+        wasm = "on",
+        wasm_filters = assert(user_filters[1].name),
+        wasm_filters_path = temp_dir,
+      })
+      assert.is_nil(err)
+      assert.same({ user_filters[1] }, conf.wasm_modules_parsed)
+    end)
+
+    pending("wasm_filters = 'bundled' allows all bundled filters", function()
     end)
 
   end)

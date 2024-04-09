@@ -171,11 +171,12 @@ local function load_config_file(path)
 end
 
 --- Get available Wasm filters list
--- @param[type=string] Path where Wasm filters are stored.
+---@param filters_path string # Path where Wasm filters are stored.
+---@return kong.configuration.wasm_filter[]
 local function get_wasm_filters(filters_path)
   local wasm_filters = {}
 
-  if filters_path then
+  if filters_path and pl_path.isdir(filters_path) then
     local filter_files = {}
     for entry in pl_path.dir(filters_path) do
       local pathname = pl_path.join(filters_path, entry)
@@ -547,8 +548,94 @@ local function load(path, custom_conf, opts)
 
   -- Wasm module support
   if conf.wasm then
-    local wasm_filters = get_wasm_filters(conf.wasm_filters_path)
-    conf.wasm_modules_parsed = setmetatable(wasm_filters, conf_constants._NOP_TOSTRING_MT)
+    if not conf.wasm_filters or #conf.wasm_filters == 0 then
+      -- Backwards compatibility: before `wasm_filters` existed, all user
+      -- filters discovered in `wasm_filters_path` would be enabled implicitly
+      if conf.wasm_filters_path then
+        conf.wasm_filters = { "user" }
+
+      else
+        conf.wasm_filters = { "off" }
+      end
+    end
+
+    ---@type table<string, boolean>
+    local allowed_filter_names = {}
+    local allow_bundled_filters = false
+    local allow_user_filters = false
+    local disable_all_filters = false
+    for _, filter in ipairs(conf.wasm_filters) do
+      if filter == "bundled" then
+        allow_bundled_filters = true
+
+      elseif filter == "user" then
+        allow_user_filters = true
+
+      elseif filter == "off" then
+        disable_all_filters = true
+
+      else
+        allowed_filter_names[filter] = true
+      end
+    end
+
+    if disable_all_filters then
+      allowed_filter_names = {}
+      allow_bundled_filters = false
+      allow_user_filters = false
+    end
+
+    ---@type kong.configuration.wasm_filter[]
+    local active_filters = {}
+    ---@type table<string, boolean>
+    local active_filter_names = {}
+
+    -- TODO: make this a distribution constant of sorts
+    local bundled_filters = get_wasm_filters("/usr/local/kong/include/filters") or {}
+    for _, filter in ipairs(bundled_filters) do
+      if allow_bundled_filters or allowed_filter_names[filter.name] then
+        insert(active_filters, filter)
+        active_filter_names[filter.name] = true
+      end
+    end
+
+    ---@type string[]
+    local conflicts = {}
+
+    local user_filters = get_wasm_filters(conf.wasm_filters_path)
+    for _, filter in ipairs(user_filters) do
+      if allow_user_filters or allowed_filter_names[filter.name] then
+        if active_filter_names[filter.name] then
+          insert(conflicts, filter.name)
+
+        else
+          insert(active_filters, filter)
+          active_filter_names[filter.name] = true
+        end
+      end
+    end
+
+    if #conflicts > 0 then
+      local e = "One or more wasm filters in %q conflicts with a bundled " ..
+                "filter name:" ..
+                "\n\n" ..
+                "%s" ..
+                "\n\n" ..
+                "To remedy this, you may need to remove 'bundled' from " ..
+                "`wasm_filters` and add enable any chosen bundled filters " ..
+                "one-by-one. Alternatively, you may rename one of the " ..
+                "conflicting filters in your `wasm_filters_path` directory " ..
+                "(this is necessary if you want to use both the bundled " ..
+                "filter and the user-supplied filter)."
+
+      return nil, fmt(e, conf.wasm_filters_path, table.concat(conflicts, ", "))
+    end
+
+    sort(active_filters, function(lhs, rhs)
+      return lhs.name < rhs.name
+    end)
+
+    conf.wasm_modules_parsed = setmetatable(active_filters, conf_constants._NOP_TOSTRING_MT)
 
     local function add_wasm_directive(directive, value, prefix)
       local directive_name = (prefix or "") .. directive

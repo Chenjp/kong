@@ -2053,6 +2053,8 @@
                         #   top level are registered
                         # * This path _may_ be a symlink to a directory.
 
+wasm_filters =
+
 #------------------------------------------------------------------------------
 # WASM injected directives
 #------------------------------------------------------------------------------

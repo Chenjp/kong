@@ -541,6 +541,7 @@ local CONF_PARSERS = {
 
   wasm = { typ = "boolean" },
   wasm_filters_path = { typ = "string" },
+  wasm_filters = { typ = "array" },
 
   error_template_html = { typ = "string" },
   error_template_json = { typ = "string" },
