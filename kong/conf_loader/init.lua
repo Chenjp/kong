@@ -9,6 +9,7 @@ local socket_url = require "socket.url"
 local conf_constants = require "kong.conf_loader.constants"
 local listeners = require "kong.conf_loader.listeners"
 local conf_parse = require "kong.conf_loader.parse"
+local nginx_signals = require "kong.cmd.utils.nginx_signals"
 local pl_pretty = require "pl.pretty"
 local pl_config = require "pl.config"
 local pl_file = require "pl.file"
@@ -590,7 +591,28 @@ local function load(path, custom_conf, opts)
     ---@type table<string, boolean>
     local active_filter_names = {}
 
-    local bundled_filters = get_wasm_filters(conf_constants.WASM_BUNDLED_FILTERS_PATH)
+    local bundled_filter_path = conf_constants.WASM_BUNDLED_FILTERS_PATH
+    if not pl_path.isdir(bundled_filter_path) then
+      local alt_path
+
+      local nginx_bin = nginx_signals.find_nginx_bin(conf)
+      if nginx_bin then
+        alt_path = pl_path.dirname(nginx_bin) .. "/../proxy_wasm_filters"
+      end
+
+      if alt_path and pl_path.isdir(alt_path) then
+        log.debug("loading bundled proxy-wasm filters from alt path: %s",
+                  alt_path)
+        bundled_filter_path = alt_path
+
+      else
+        log.warn("Bundled proxy-wasm filters path (%s) does not exist " ..
+                 "or is not a directory. Bundled filters may not be " ..
+                 "available", bundled_filter_path)
+      end
+    end
+
+    local bundled_filters = get_wasm_filters(bundled_filter_path)
     for _, filter in ipairs(bundled_filters) do
       if allow_bundled_filters or allowed_filter_names[filter.name] then
         insert(active_filters, filter)
