@@ -279,7 +279,7 @@ local constants = {
     }
   },
 
-  WASM_BUNDLED_FILTERS_PATH = "/usr/local/kong/proxy_wasm_filters",
+  WASM_BUNDLED_FILTERS_PATH = "/usr/local/kong/include/filters",
 }
 
 for _, v in ipairs(constants.CLUSTERING_SYNC_STATUS) do

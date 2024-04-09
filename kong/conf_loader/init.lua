@@ -597,7 +597,7 @@ local function load(path, custom_conf, opts)
 
       local nginx_bin = nginx_signals.find_nginx_bin(conf)
       if nginx_bin then
-        alt_path = pl_path.dirname(nginx_bin) .. "/../proxy_wasm_filters"
+        alt_path = pl_path.dirname(nginx_bin) .. "/../../../kong/include/filters"
       end
 
       if alt_path and pl_path.isdir(alt_path) then
