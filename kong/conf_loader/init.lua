@@ -549,17 +549,6 @@ local function load(path, custom_conf, opts)
 
   -- Wasm module support
   if conf.wasm then
-    if not conf.wasm_filters or #conf.wasm_filters == 0 then
-      -- Backwards compatibility: before `wasm_filters` existed, all user
-      -- filters discovered in `wasm_filters_path` would be enabled implicitly
-      if conf.wasm_filters_path then
-        conf.wasm_filters = { "user" }
-
-      else
-        conf.wasm_filters = { "off" }
-      end
-    end
-
     ---@type table<string, boolean>
     local allowed_filter_names = {}
     local allow_bundled_filters = false

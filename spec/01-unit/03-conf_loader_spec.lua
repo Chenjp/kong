@@ -2005,24 +2005,14 @@ describe("Configuration loader", function()
       assert.is_nil(conf)
     end)
 
-    it("wasm_filters default with unspecified `wasm_filters_path`", function()
-      local conf, err = conf_loader(nil, {
-        wasm = "on",
-        wasm_filters_path = nil,
-      })
-      assert.is_nil(err)
-      assert.same({}, conf.wasm_modules_parsed)
-      assert.same({ "off" }, conf.wasm_filters)
-    end)
-
-    it("wasm_filters default when `wasm_filters_path` is set", function()
+    it("wasm_filters default", function()
       local conf, err = conf_loader(nil, {
         wasm = "on",
         wasm_filters_path = temp_dir,
       })
       assert.is_nil(err)
       assert.same(user_filters, conf.wasm_modules_parsed)
-      assert.same({ "user" }, conf.wasm_filters)
+      assert.same({ "bundled", "user" }, conf.wasm_filters)
     end)
 
     it("wasm_filters = off", function()
