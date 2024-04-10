@@ -138,6 +138,17 @@ function _M:access(conf)
     end
   end
 
+  -- resolve the real plugin config values
+  local conf_m = ai_shared.resolve_plugin_conf(kong.request, conf)
+
+  -- we need a model to run
+  if not conf_m.model.name then
+    -- TODO check input model and resolved model aren't the same
+    return bad_request("model parameter not located in request or in configuration")
+  end
+
+  kong.ctx.plugin.llm_model_requested = conf_m.model.name
+
   -- check the incoming format is the same as the configured LLM format
   local compatible, err = llm.is_compatible(request_table, route_type)
   if not compatible then
@@ -146,19 +157,19 @@ function _M:access(conf)
   end
 
   -- execute pre-request hooks for this driver
-  local ok, err = ai_driver.pre_request(conf, request_table)
+  local ok, err = ai_driver.pre_request(conf_m, request_table)
   if not ok then
     return bad_request(err)
   end
 
   -- transform the body to Kong-format for this provider/model
-  local parsed_request_body, content_type, err = ai_driver.to_format(request_table, conf.model, route_type)
+  local parsed_request_body, content_type, err = ai_driver.to_format(request_table, conf_m.model, route_type)
   if err then
     return bad_request(err)
   end
 
   -- execute pre-request hooks for "all" drivers before set new body
-  local ok, err = ai_shared.pre_request(conf, parsed_request_body)
+  local ok, err = ai_shared.pre_request(conf_m, parsed_request_body)
   if not ok then
     return bad_request(err)
   end
@@ -166,7 +177,7 @@ function _M:access(conf)
   kong.service.request.set_body(parsed_request_body, content_type)
 
   -- now re-configure the request for this operation type
-  local ok, err = ai_driver.configure_request(conf)
+  local ok, err = ai_driver.configure_request(conf_m)
   if not ok then
     return internal_server_error(err)
   end
