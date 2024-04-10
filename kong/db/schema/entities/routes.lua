@@ -96,7 +96,7 @@ if kong_router_flavor == "expressions" then
 -- router_flavor in ('traditional_compatible', 'traditional')
 else
   local PATH_V1_DEPRECATION_MSG
-  local snis_elements_type
+  local snis_elements_type = typedefs.wildcard_host
 
   if kong_router_flavor == "traditional" then
     snis_elements_type = typedefs.sni
@@ -106,7 +106,6 @@ else
       "please use path_handling='v0' instead"
 
   elseif kong_router_flavor == "traditional_compatible" then
-    snis_elements_type = typedefs.wildcard_host
     PATH_V1_DEPRECATION_MSG =
       "path_handling='v1' is deprecated and " ..
       "will not work under 'traditional_compatible' router_flavor, " ..
